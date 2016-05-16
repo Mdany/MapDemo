@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Toast;
 
+import com.baidu.location.BDLocation;
+import com.baidu.location.LocationClient;
 import com.baidu.mapapi.map.BaiduMap;
 import com.baidu.mapapi.map.BitmapDescriptor;
 import com.baidu.mapapi.map.BitmapDescriptorFactory;
@@ -17,19 +19,50 @@ import com.baidu.mapapi.map.MarkerOptions;
 import com.baidu.mapapi.map.TextOptions;
 import com.baidu.mapapi.model.LatLng;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements LocationUtils.LocationListener {
     private MapView mapView;
     private BaiduMap baiduMap;
+    //经纬度
+    private double lat;
+    private double lon;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        initView();
+        setLocationListener();
+    }
+
+    /**
+     * 初始化view
+     */
+    private void initView() {
         mapView = (MapView) findViewById(R.id.map_view);
         if (mapView == null) return;
         baiduMap = mapView.getMap();
+    }
+
+    /**
+     * 定位
+     */
+    private void setLocationListener() {
+        LocationUtils.getInstance().setLocationListener(this);
+    }
+
+    @Override
+    public void getLocation(BDLocation bdLocation) {
+        lat = bdLocation.getLatitude();
+        lon = bdLocation.getLongitude();
+        initMapMarker();
+    }
+
+    /**
+     * marker初始化
+     */
+    private void initMapMarker() {
         //定义Maker坐标点
-        LatLng point = new LatLng(39.963175, 116.400244);
+        LatLng point = new LatLng(lat, lon);
         //构建Marker图标
         BitmapDescriptor bitmap = BitmapDescriptorFactory
                 .fromResource(R.mipmap.logo);
@@ -105,6 +138,7 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         //在activity执行onPause时执行mMapView.onPause()，实现地图生命周期管理
         mapView.onPause();
+        LocationUtils.getInstance().stopLocation();
     }
 
     @Override
@@ -119,5 +153,6 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         //在activity执行onResume时执行mMapView. onResume ()，实现地图生命周期管理
         mapView.onResume();
+        LocationUtils.getInstance().startLocation();
     }
 }

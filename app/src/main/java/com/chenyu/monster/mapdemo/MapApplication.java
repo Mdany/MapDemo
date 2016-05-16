@@ -12,6 +12,6 @@ public class MapApplication extends Application {
     public void onCreate() {
         super.onCreate();
         application = this;
-        LocationUtils.init();
+        LocationUtils.getInstance().initLocationClient(application);
     }
 }
