@@ -1,6 +1,7 @@
 package com.chenyu.monster.mapdemo;
 
 import android.content.Context;
+import android.widget.Toast;
 
 import com.baidu.location.BDLocation;
 import com.baidu.location.BDLocationListener;
@@ -13,11 +14,6 @@ import com.baidu.mapapi.SDKInitializer;
  */
 public class LocationUtils {
     private static LocationUtils instance;
-    private LocationClient locationClient;
-    /**
-     * 定位数据回调
-     */
-    private LocationListener locationListener;
 
     public LocationUtils() {
         init();
@@ -36,6 +32,15 @@ public class LocationUtils {
     }
 
     /**
+     * ====================定位部分========================
+     **/
+    private LocationClient locationClient;
+    /**
+     * 定位数据回调
+     */
+    private LocationListener locationListener;
+
+    /**
      * 初始化
      */
     public static void init() {
@@ -52,12 +57,19 @@ public class LocationUtils {
         LocationClientOption option = new LocationClientOption();
         option.setLocationMode(LocationClientOption.LocationMode.Hight_Accuracy);//高精度
         option.setCoorType("bd09ll");
-        int span = 3000;
-        option.setScanSpan(span);
+        //int span = 3000;
+        //option.setScanSpan(span);//定时扫描定位，>=1000才会生效
+        option.setIsNeedAddress(true);
+        locationClient.setLocOption(option);
         locationClient.registerLocationListener(new BDLocationListener() {
             @Override
             public void onReceiveLocation(BDLocation bdLocation) {
-                locationListener.getLocation(bdLocation);
+                int code = bdLocation.getLocType();
+                if (code == 61 || code == 161 || code == 66 || code == 65) {
+                    locationListener.getLocation(bdLocation);
+                } else {
+                    Toast.makeText(context, "定位失败", Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }
@@ -78,11 +90,14 @@ public class LocationUtils {
         }
     }
 
-    public void setLocationListener(LocationListener listener){
+    public void setLocationListener(LocationListener listener) {
         locationListener = listener;
     }
 
-    public interface LocationListener{
+    public interface LocationListener {
         void getLocation(BDLocation bdLocation);
     }
+
+    /**====================检索部分========================**/
+
 }
