@@ -33,6 +33,7 @@ import com.baidu.mapapi.search.route.WalkingRoutePlanOption;
 import com.baidu.mapapi.search.route.WalkingRouteResult;
 import com.chenyu.monster.mapdemo.overlayutil.BikingRouteOverlay;
 import com.chenyu.monster.mapdemo.overlayutil.DrivingRouteOverlay;
+import com.chenyu.monster.mapdemo.overlayutil.OverlayManager;
 import com.chenyu.monster.mapdemo.overlayutil.TransitRouteOverlay;
 import com.chenyu.monster.mapdemo.overlayutil.WalkingRouteOverlay;
 
@@ -47,7 +48,12 @@ public class MainActivity extends AppCompatActivity implements
     //地理信息对象：包括地址，国家，门牌号
     private Address address;
     //创建检索实例
-    RoutePlanSearch mSearch;
+    private RoutePlanSearch mSearch;
+    //路线覆盖
+    private OverlayManager routeOverlay;
+    //测试用的经纬度偏移量及定位次数
+//    private double offset = 0.005;
+//    private int count = 1;
 
     @Override
     protected void onPause() {
@@ -102,6 +108,9 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void getLocation(BDLocation bdLocation) {
+//        lat = bdLocation.getLatitude() + offset * count;
+//        lon = bdLocation.getLongitude() + offset * count;
+//        ++count;
         lat = bdLocation.getLatitude();
         lon = bdLocation.getLongitude();
         address = bdLocation.getAddress();
@@ -117,14 +126,18 @@ public class MainActivity extends AppCompatActivity implements
         //构建Marker图标
         BitmapDescriptor bitmap = BitmapDescriptorFactory
                 .fromResource(R.mipmap.logo);
+        //清除所有覆盖物和InfoWindow
+        baiduMap.clear();
         //构建MarkerOption，用于在地图上添加Marker
-        MarkerOptions option = new MarkerOptions()
+        MarkerOptions options = new MarkerOptions()
                 .position(point)//定位显示marker位置
                 .icon(bitmap)//marker icon
                 .zIndex(9)//marker所在层级
                 .draggable(false)//marker是否是可拖拽的
-                .alpha(0.5f);//marker透明度
-        option.animateType(MarkerOptions.MarkerAnimateType.grow);//marker使用成长动画
+                .alpha(0.5f);
+        options.animateType(MarkerOptions.MarkerAnimateType.grow);//marker使用成长动画
+        //在地图上添加Marker，并显示
+        baiduMap.addOverlay(options);
 
         //构建文字覆盖物
 //        TextOptions option = new TextOptions()
@@ -142,8 +155,6 @@ public class MainActivity extends AppCompatActivity implements
         //创建InfoWindow，传入view，地理坐标点，y偏移量
         final InfoWindow infoWindow = new InfoWindow(pop, point, -47);
 
-        //在地图上添加Marker，并显示
-        baiduMap.addOverlay(option);
         baiduMap.setOnMarkerDragListener(new BaiduMap.OnMarkerDragListener() {
             @Override
             public void onMarkerDrag(Marker marker) {
@@ -161,6 +172,8 @@ public class MainActivity extends AppCompatActivity implements
             }
         });
         //覆盖物marker点击事件中显示infoWindow
+        //点击骑行等出行方式overlay，也会激发此事件,此处return false而overlay里return true，则此事件优先级高
+        //可能跟地图层级有关，暂时没有测试
         baiduMap.setOnMarkerClickListener(new BaiduMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
@@ -168,15 +181,16 @@ public class MainActivity extends AppCompatActivity implements
                 return false;
             }
         });
+        //地图点击事件
         baiduMap.setOnMapClickListener(new BaiduMap.OnMapClickListener() {
             @Override
-            public void onMapClick(LatLng latLng) {
+            public void onMapClick(LatLng latLng) {//地图其它位置点击事件
                 baiduMap.hideInfoWindow();
                 Toast.makeText(MainActivity.this, "click", Toast.LENGTH_SHORT).show();
             }
 
             @Override
-            public boolean onMapPoiClick(MapPoi mapPoi) {
+            public boolean onMapPoiClick(MapPoi mapPoi) {//地图poi点点击事件
                 baiduMap.hideInfoWindow();
                 Toast.makeText(MainActivity.this, "Poi click", Toast.LENGTH_SHORT).show();
                 return false;
@@ -184,16 +198,19 @@ public class MainActivity extends AppCompatActivity implements
         });
     }
 
+    /**
+     * 初始化检索生成路径
+     */
     private void initSearch() {
         mSearch = RoutePlanSearch.newInstance();
-
+        mSearch.setOnGetRoutePlanResultListener(this);
     }
 
     @Override
     public void onGetWalkingRouteResult(WalkingRouteResult walkingRouteResult) {//步行路线结果
         if (walkingRouteResult == null
                 || walkingRouteResult.error != SearchResult.ERRORNO.NO_ERROR) {
-            Toast.makeText(context, "公共交通路线，未找到结果", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "步行路线，未找到结果", Toast.LENGTH_SHORT).show();
             return;
         }
         if (walkingRouteResult.error == SearchResult.ERRORNO.AMBIGUOUS_ROURE_ADDR) {
@@ -204,6 +221,7 @@ public class MainActivity extends AppCompatActivity implements
         if (walkingRouteResult.error == SearchResult.ERRORNO.NO_ERROR) {
             WalkingRouteOverlay overlay = new WalkingRouteOverlay(baiduMap);
             baiduMap.setOnMarkerClickListener(overlay);
+            routeOverlay = overlay;
             overlay.setData(walkingRouteResult.getRouteLines().get(0));
             overlay.addToMap();
             overlay.zoomToSpan();
@@ -225,6 +243,7 @@ public class MainActivity extends AppCompatActivity implements
         if (transitRouteResult.error == SearchResult.ERRORNO.NO_ERROR) {
             TransitRouteOverlay overlay = new TransitRouteOverlay(baiduMap);
             baiduMap.setOnMarkerClickListener(overlay);
+            routeOverlay = overlay;
             overlay.setData(transitRouteResult.getRouteLines().get(0));
             overlay.addToMap();
             overlay.zoomToSpan();
@@ -235,7 +254,7 @@ public class MainActivity extends AppCompatActivity implements
     public void onGetDrivingRouteResult(DrivingRouteResult drivingRouteResult) {//驾车路线结果
         if (drivingRouteResult == null
                 || drivingRouteResult.error != SearchResult.ERRORNO.NO_ERROR) {
-            Toast.makeText(context, "公共交通路线，未找到结果", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "自驾路线，未找到结果", Toast.LENGTH_SHORT).show();
             return;
         }
         if (drivingRouteResult.error == SearchResult.ERRORNO.AMBIGUOUS_ROURE_ADDR) {
@@ -246,6 +265,7 @@ public class MainActivity extends AppCompatActivity implements
         if (drivingRouteResult.error == SearchResult.ERRORNO.NO_ERROR) {
             DrivingRouteOverlay overlay = new DrivingRouteOverlay(baiduMap);
             baiduMap.setOnMarkerClickListener(overlay);
+            routeOverlay = overlay;
             overlay.setData(drivingRouteResult.getRouteLines().get(0));
             overlay.addToMap();
             overlay.zoomToSpan();
@@ -256,7 +276,7 @@ public class MainActivity extends AppCompatActivity implements
     public void onGetBikingRouteResult(BikingRouteResult bikingRouteResult) {//骑行路线结果
         if (bikingRouteResult == null
                 || bikingRouteResult.error != SearchResult.ERRORNO.NO_ERROR) {
-            Toast.makeText(context, "公共交通路线，未找到结果", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, "骑行路线，未找到结果", Toast.LENGTH_SHORT).show();
             return;
         }
         if (bikingRouteResult.error == SearchResult.ERRORNO.AMBIGUOUS_ROURE_ADDR) {
@@ -267,6 +287,7 @@ public class MainActivity extends AppCompatActivity implements
         if (bikingRouteResult.error == SearchResult.ERRORNO.NO_ERROR) {
             BikingRouteOverlay overlay = new BikingRouteOverlay(baiduMap);
             baiduMap.setOnMarkerClickListener(overlay);
+            routeOverlay = overlay;
             overlay.setData(bikingRouteResult.getRouteLines().get(0));
             overlay.addToMap();
             overlay.zoomToSpan();
@@ -283,7 +304,10 @@ public class MainActivity extends AppCompatActivity implements
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
         PlanNode startNode = PlanNode.withLocation(new LatLng(lat, lon));
-        PlanNode endNode = PlanNode.withLocation(new LatLng(116.403694, 39.914935));
+        PlanNode endNode = PlanNode.withLocation(new LatLng(39.914935, 116.403694));
+        if (routeOverlay!=null){//每次换overlay都要清除前一个
+            routeOverlay.removeFromMap();
+        }
         switch (id) {
             case R.id.walk:
                 mSearch.walkingSearch((new WalkingRoutePlanOption())

@@ -57,8 +57,8 @@ public class LocationUtils {
         LocationClientOption option = new LocationClientOption();
         option.setLocationMode(LocationClientOption.LocationMode.Hight_Accuracy);//高精度
         option.setCoorType("bd09ll");
-        //int span = 3000;
-        //option.setScanSpan(span);//定时扫描定位，>=1000才会生效
+//        int span = 3000;
+//        option.setScanSpan(span);//定时扫描定位，>=1000才会生效
         option.setIsNeedAddress(true);
         locationClient.setLocOption(option);
         locationClient.registerLocationListener(new BDLocationListener() {
