@@ -169,6 +169,7 @@ public class MainActivity extends AppCompatActivity implements
         go.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                //调起手机百度地图app，没有则调起百度地图webapp
                 NaviParaOption naviParaOption;
                 RouteParaOption routeParaOption;
                 switch (itemId) {
@@ -354,6 +355,7 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        //不同出行方式的调用
         itemId = item.getItemId();
         startPoint = new LatLng(lat, lon);
         endPoint = new LatLng(39.914935, 116.403694);
