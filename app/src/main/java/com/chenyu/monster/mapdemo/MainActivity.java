@@ -6,6 +6,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.Toast;
 
 import com.baidu.location.Address;
@@ -19,6 +20,8 @@ import com.baidu.mapapi.map.MapView;
 import com.baidu.mapapi.map.Marker;
 import com.baidu.mapapi.map.MarkerOptions;
 import com.baidu.mapapi.model.LatLng;
+import com.baidu.mapapi.navi.BaiduMapNavigation;
+import com.baidu.mapapi.navi.NaviParaOption;
 import com.baidu.mapapi.search.core.SearchResult;
 import com.baidu.mapapi.search.route.BikingRoutePlanOption;
 import com.baidu.mapapi.search.route.BikingRouteResult;
@@ -31,6 +34,8 @@ import com.baidu.mapapi.search.route.TransitRoutePlanOption;
 import com.baidu.mapapi.search.route.TransitRouteResult;
 import com.baidu.mapapi.search.route.WalkingRoutePlanOption;
 import com.baidu.mapapi.search.route.WalkingRouteResult;
+import com.baidu.mapapi.utils.route.BaiduMapRoutePlan;
+import com.baidu.mapapi.utils.route.RouteParaOption;
 import com.chenyu.monster.mapdemo.overlayutil.BikingRouteOverlay;
 import com.chenyu.monster.mapdemo.overlayutil.DrivingRouteOverlay;
 import com.chenyu.monster.mapdemo.overlayutil.OverlayManager;
@@ -51,6 +56,13 @@ public class MainActivity extends AppCompatActivity implements
     private RoutePlanSearch mSearch;
     //路线覆盖
     private OverlayManager routeOverlay;
+    //具体哪个出行方式
+    private int itemId = -1;
+    //起始两点
+    private PlanNode startNode;
+    private PlanNode endNode;
+    private LatLng startPoint;
+    private LatLng endPoint;
     //测试用的经纬度偏移量及定位次数
 //    private double offset = 0.005;
 //    private int count = 1;
@@ -70,6 +82,8 @@ public class MainActivity extends AppCompatActivity implements
         mapView.onDestroy();
         //释放检索实力
         mSearch.destroy();
+        //结束调启功能时调用finish方法以释放相关资源
+        BaiduMapRoutePlan.finish(context);
     }
 
     @Override
@@ -151,6 +165,44 @@ public class MainActivity extends AppCompatActivity implements
         //弹窗覆盖物
         //创建InfoWindow展示的view
         View pop = View.inflate(this, R.layout.map_pop_window, null);
+        Button go = (Button) pop.findViewById(R.id.go_baidu);
+        go.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                NaviParaOption naviParaOption;
+                RouteParaOption routeParaOption;
+                switch (itemId) {
+                    case R.id.walk:
+                        naviParaOption = new NaviParaOption()
+                                .startPoint(startPoint)
+                                .endPoint(endPoint);
+                        BaiduMapNavigation.openBaiduMapWalkNavi(naviParaOption, context);
+                        break;
+                    case R.id.biking:
+                        naviParaOption = new NaviParaOption()
+                                .startPoint(startPoint)
+                                .endPoint(endPoint);
+                        BaiduMapNavigation.openBaiduMapBikeNavi(naviParaOption, context);
+                        break;
+                    case R.id.transit:
+                        routeParaOption = new RouteParaOption()
+                                .startPoint(startPoint)
+                                .endPoint(endPoint)
+                                .busStrategyType(RouteParaOption.EBusStrategyType.bus_recommend_way);//推荐线路
+                        BaiduMapRoutePlan.openBaiduMapTransitRoute(routeParaOption, context);
+                        break;
+                    case R.id.drive:
+                        routeParaOption = new RouteParaOption()
+                                .startPoint(startPoint)
+                                .endPoint(endPoint);
+                        BaiduMapRoutePlan.openBaiduMapDrivingRoute(routeParaOption, context);
+                        break;
+                    default:
+                        baiduMap.hideInfoWindow();
+                        Toast.makeText(context,"请选择出行方式",Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
         //定义用于显示该InfoWindow的坐标点，这里直接使用point就可以
         //创建InfoWindow，传入view，地理坐标点，y偏移量
         final InfoWindow infoWindow = new InfoWindow(pop, point, -47);
@@ -302,13 +354,15 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        PlanNode startNode = PlanNode.withLocation(new LatLng(lat, lon));
-        PlanNode endNode = PlanNode.withLocation(new LatLng(39.914935, 116.403694));
-        if (routeOverlay!=null){//每次换overlay都要清除前一个
+        itemId = item.getItemId();
+        startPoint = new LatLng(lat, lon);
+        endPoint = new LatLng(39.914935, 116.403694);
+        startNode = PlanNode.withLocation(startPoint);
+        endNode = PlanNode.withLocation(endPoint);
+        if (routeOverlay != null) {//每次换overlay都要清除前一个
             routeOverlay.removeFromMap();
         }
-        switch (id) {
+        switch (itemId) {
             case R.id.walk:
                 mSearch.walkingSearch((new WalkingRoutePlanOption())
                         .from(startNode)
