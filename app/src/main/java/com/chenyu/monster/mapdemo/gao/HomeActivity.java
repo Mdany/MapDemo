@@ -5,6 +5,8 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import com.amap.api.location.AMapLocation;
@@ -15,20 +17,47 @@ import com.amap.api.maps2d.AMap;
 import com.amap.api.maps2d.LocationSource;
 import com.amap.api.maps2d.MapView;
 import com.amap.api.maps2d.model.BitmapDescriptorFactory;
+import com.amap.api.maps2d.model.MarkerOptions;
 import com.amap.api.maps2d.model.MyLocationStyle;
+import com.amap.api.maps2d.overlay.DrivingRouteOverlay;
+import com.amap.api.maps2d.overlay.WalkRouteOverlay;
+import com.amap.api.services.core.LatLonPoint;
+import com.amap.api.services.route.BusRouteResult;
+import com.amap.api.services.route.DrivePath;
+import com.amap.api.services.route.DriveRouteResult;
+import com.amap.api.services.route.RouteSearch;
+import com.amap.api.services.route.WalkPath;
+import com.amap.api.services.route.WalkRouteResult;
 import com.chenyu.monster.mapdemo.R;
 
 /**
  * Created by chenyu on 16/5/18.
  */
-public class HomeActivity extends AppCompatActivity implements LocationSource, AMapLocationListener {
+public class HomeActivity extends AppCompatActivity implements LocationSource, AMapLocationListener, RouteSearch.OnRouteSearchListener {
     private Context mContext;
+    //map view
     private MapView twdMap;
+    //map
     private AMap map;
     //定位结果回调
     private OnLocationChangedListener mListener;
     private AMapLocationClient mLocationClient;
     private AMapLocationClientOption mLocationOption;
+    //路线搜索
+    private RouteSearch routeSearch;
+    //三种出行路线
+    private WalkRouteResult mWalkRouteResult;
+    private BusRouteResult mTransitRouteResult;
+    private DriveRouteResult mDriveRouteResult;
+    //起始点
+    private LatLonPoint startNode;//起点，
+    private LatLonPoint endNode = new LatLonPoint(39.917636, 116.397743);//终点，
+    //出行方式itemId
+    private int itemId;
+    //记录定位点
+    private AMapLocation mLocation;
+    private DrivingRouteOverlay drivingRouteOverlay;
+    private WalkRouteOverlay walkRouteOverlay;
 
     @Override
     protected void onResume() {
@@ -59,11 +88,48 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        //三种出行方式，未定位成功则不允许选择
+        if (mLocation == null) return super.onOptionsItemSelected(item);
+        itemId = item.getItemId();
+        RouteSearch.FromAndTo fromAndTo = new RouteSearch.FromAndTo(startNode, endNode);
+        if (drivingRouteOverlay != null) {
+            drivingRouteOverlay.removeFromMap();
+        }
+        if (walkRouteOverlay != null) {
+            walkRouteOverlay.removeFromMap();
+        }
+        switch (itemId) {
+            case R.id.walk:
+                RouteSearch.WalkRouteQuery walkRouteQuery = new RouteSearch.WalkRouteQuery(fromAndTo, RouteSearch.WalkDefault);
+                routeSearch.calculateWalkRouteAsyn(walkRouteQuery);
+                return true;
+            case R.id.transit:
+                RouteSearch.BusRouteQuery busRouteQuery = new RouteSearch.BusRouteQuery(fromAndTo, RouteSearch.BusDefault, mLocation.getCity(), 1);
+                routeSearch.calculateBusRouteAsyn(busRouteQuery);
+                return true;
+            case R.id.drive:
+                RouteSearch.DriveRouteQuery driveRouteQuery = new RouteSearch.DriveRouteQuery(fromAndTo, RouteSearch.DrivingDefault, null, null, "");
+                routeSearch.calculateDriveRouteAsyn(driveRouteQuery);
+                return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.a_home);
         mContext = this;
         initView(savedInstanceState);
+        initRoute();
+        registerListener();
     }
 
     /**
@@ -75,8 +141,19 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
             twdMap.onCreate(savedInstanceState);//此方法必须重写
             map = twdMap.getMap();
         }
-
         setupMap();
+    }
+
+    /**
+     * 设置起始点icon
+     */
+    private void setFromAndToMarker() {
+        map.addMarker(new MarkerOptions()
+                .position(AMapUtil.convertToLatLng(startNode))
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.start)));
+        map.addMarker(new MarkerOptions()
+                .position(AMapUtil.convertToLatLng(endNode))
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.end)));
     }
 
     /**
@@ -86,7 +163,7 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
         // 自定义系统定位小蓝点
         MyLocationStyle myLocationStyle = new MyLocationStyle();
         myLocationStyle.myLocationIcon(BitmapDescriptorFactory
-                .fromResource(R.mipmap.location_marker));// 设置小蓝点的图标
+                .fromResource(R.drawable.location_marker));// 设置小蓝点的图标
         myLocationStyle.strokeColor(Color.BLACK);// 设置圆形的边框颜色
         myLocationStyle.radiusFillColor(Color.argb(100, 0, 0, 180));// 设置圆形的填充颜色
         // myLocationStyle.anchor(int,int)//设置小蓝点的锚点
@@ -95,6 +172,16 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
         map.getUiSettings().setMyLocationButtonEnabled(true);//设置定位按钮是否显示
         map.setMyLocationEnabled(true);//设置true表示显示定位层并可触发定位，false表示隐藏定位层并不可触发定位，默认false
         map.setMyLocationStyle(myLocationStyle);
+    }
+
+    /**
+     * 注册监听
+     */
+    private void registerListener() {
+//        map.setOnMapClickListener(this);
+//        map.setOnMarkerClickListener(this);
+//        map.setOnInfoWindowClickListener(this);
+//        map.setInfoWindowAdapter(this);
     }
 
     /**
@@ -107,6 +194,11 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
         if (mListener != null && aMapLocation != null) {
             if (aMapLocation.getErrorCode() == 0) {//错误码为0表示定位正常，即NO_ERROR
                 mListener.onLocationChanged(aMapLocation);
+                mLocation = aMapLocation;
+                double lat = mLocation.getLatitude();
+                double lng = mLocation.getLongitude();
+                startNode = new LatLonPoint(lat, lng);
+                setFromAndToMarker();
             } else {
                 String errText = "定位失败," + aMapLocation.getErrorCode() + ": " + aMapLocation.getErrorInfo();
                 Toast.makeText(mContext, errText, Toast.LENGTH_SHORT).show();
@@ -152,5 +244,83 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
             mLocationClient.onDestroy();
         }
         mLocationClient = null;
+    }
+
+    /**
+     * 设置route
+     */
+    private void initRoute() {
+        routeSearch = new RouteSearch(mContext);
+        routeSearch.setRouteSearchListener(this);//设置回调监听
+    }
+
+    @Override
+    public void onBusRouteSearched(BusRouteResult busRouteResult, int i) {
+        if (busRouteResult == null || i != 1000) {//1000代表正确，我觉得高德应该弄个自己的工具类命好名
+            Toast.makeText(mContext, "公交路线，未找到结果", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (i != 1000) {
+            Toast.makeText(mContext, "公交路线，未知错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (busRouteResult.getPaths().size() <= 0) {
+            Toast.makeText(mContext, "公交路线，未找到结果", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        //bus我就不写了，太长了，百度比这不知高到哪里去了
+    }
+
+    @Override
+    public void onDriveRouteSearched(DriveRouteResult driveRouteResult, int i) {
+        if (driveRouteResult == null || i != 1000) {//1000代表正确，我觉得高德应该弄个自己的工具类命好名
+            Toast.makeText(mContext, "自驾路线，未找到结果", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (i != 1000) {
+            Toast.makeText(mContext, "自驾路线，未知错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (driveRouteResult.getPaths().size() <= 0) {
+            Toast.makeText(mContext, "自驾路线，未找到结果", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        DrivePath drivePath = driveRouteResult.getPaths().get(0);
+        DrivingRouteOverlay drivingRouteOverlay = new DrivingRouteOverlay(mContext, map, drivePath, driveRouteResult.getStartPos(), driveRouteResult.getTargetPos());
+        this.drivingRouteOverlay = drivingRouteOverlay;
+        drivingRouteOverlay.removeFromMap();
+        drivingRouteOverlay.addToMap();
+        drivingRouteOverlay.zoomToSpan();
+    }
+
+    @Override
+    public void onWalkRouteSearched(WalkRouteResult walkRouteResult, int i) {
+        if (walkRouteResult == null || i != 1000) {//1000代表正确，我觉得高德应该弄个自己的工具类命好名
+            Toast.makeText(mContext, "自驾路线，未找到结果", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (i != 1000) {
+            Toast.makeText(mContext, "自驾路线，未知错误", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (walkRouteResult.getPaths().size() <= 0) {
+            Toast.makeText(mContext, "自驾路线，未找到结果", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        WalkPath walkPath = walkRouteResult.getPaths().get(0);
+        WalkRouteOverlay walkRouteOverlay = new WalkRouteOverlay(mContext, map, walkPath, walkRouteResult.getStartPos(), walkRouteResult.getTargetPos());
+        this.walkRouteOverlay = walkRouteOverlay;
+        walkRouteOverlay.removeFromMap();
+        walkRouteOverlay.addToMap();
+        walkRouteOverlay.zoomToSpan();
     }
 }
