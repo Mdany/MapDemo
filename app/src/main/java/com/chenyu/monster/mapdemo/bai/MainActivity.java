@@ -1,4 +1,4 @@
-package com.chenyu.monster.mapdemo;
+package com.chenyu.monster.mapdemo.bai;
 
 import android.content.Context;
 import android.os.Bundle;
@@ -36,11 +36,12 @@ import com.baidu.mapapi.search.route.WalkingRoutePlanOption;
 import com.baidu.mapapi.search.route.WalkingRouteResult;
 import com.baidu.mapapi.utils.route.BaiduMapRoutePlan;
 import com.baidu.mapapi.utils.route.RouteParaOption;
-import com.chenyu.monster.mapdemo.overlayutil.BikingRouteOverlay;
-import com.chenyu.monster.mapdemo.overlayutil.DrivingRouteOverlay;
-import com.chenyu.monster.mapdemo.overlayutil.OverlayManager;
-import com.chenyu.monster.mapdemo.overlayutil.TransitRouteOverlay;
-import com.chenyu.monster.mapdemo.overlayutil.WalkingRouteOverlay;
+import com.chenyu.monster.mapdemo.R;
+import com.chenyu.monster.mapdemo.bai.overlayutil.BikingRouteOverlay;
+import com.chenyu.monster.mapdemo.bai.overlayutil.DrivingRouteOverlay;
+import com.chenyu.monster.mapdemo.bai.overlayutil.OverlayManager;
+import com.chenyu.monster.mapdemo.bai.overlayutil.TransitRouteOverlay;
+import com.chenyu.monster.mapdemo.bai.overlayutil.WalkingRouteOverlay;
 
 public class MainActivity extends AppCompatActivity implements
         LocationUtils.LocationListener, OnGetRoutePlanResultListener {
