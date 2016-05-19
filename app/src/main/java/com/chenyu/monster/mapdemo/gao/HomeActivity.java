@@ -7,6 +7,7 @@ import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.Toast;
 
 import com.amap.api.location.AMapLocation;
@@ -14,11 +15,15 @@ import com.amap.api.location.AMapLocationClient;
 import com.amap.api.location.AMapLocationClientOption;
 import com.amap.api.location.AMapLocationListener;
 import com.amap.api.maps2d.AMap;
+import com.amap.api.maps2d.AMapUtils;
 import com.amap.api.maps2d.LocationSource;
 import com.amap.api.maps2d.MapView;
 import com.amap.api.maps2d.model.BitmapDescriptorFactory;
+import com.amap.api.maps2d.model.LatLng;
+import com.amap.api.maps2d.model.Marker;
 import com.amap.api.maps2d.model.MarkerOptions;
 import com.amap.api.maps2d.model.MyLocationStyle;
+import com.amap.api.maps2d.model.NaviPara;
 import com.amap.api.maps2d.overlay.DrivingRouteOverlay;
 import com.amap.api.maps2d.overlay.WalkRouteOverlay;
 import com.amap.api.services.core.LatLonPoint;
@@ -33,7 +38,8 @@ import com.chenyu.monster.mapdemo.R;
 /**
  * Created by chenyu on 16/5/18.
  */
-public class HomeActivity extends AppCompatActivity implements LocationSource, AMapLocationListener, RouteSearch.OnRouteSearchListener {
+public class HomeActivity extends AppCompatActivity implements LocationSource, AMapLocationListener
+        , RouteSearch.OnRouteSearchListener, AMap.InfoWindowAdapter {
     private Context mContext;
     //map view
     private MapView twdMap;
@@ -58,6 +64,8 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
     private AMapLocation mLocation;
     private DrivingRouteOverlay drivingRouteOverlay;
     private WalkRouteOverlay walkRouteOverlay;
+    //起点marker
+    private Marker startMarker;
 
     @Override
     protected void onResume() {
@@ -148,12 +156,17 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
      * 设置起始点icon
      */
     private void setFromAndToMarker() {
-        map.addMarker(new MarkerOptions()
+        startMarker = map.addMarker(new MarkerOptions()
                 .position(AMapUtil.convertToLatLng(startNode))
-                .icon(BitmapDescriptorFactory.fromResource(R.drawable.start)));
+                .icon(BitmapDescriptorFactory.fromResource(R.drawable.start))
+                .title("成都市")
+                .snippet("成都市:30.679879, 104.064855")
+                .draggable(true)
+                .period(50));
         map.addMarker(new MarkerOptions()
                 .position(AMapUtil.convertToLatLng(endNode))
                 .icon(BitmapDescriptorFactory.fromResource(R.drawable.end)));
+        startMarker.showInfoWindow();
     }
 
     /**
@@ -178,10 +191,26 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
      * 注册监听
      */
     private void registerListener() {
-//        map.setOnMapClickListener(this);
-//        map.setOnMarkerClickListener(this);
-//        map.setOnInfoWindowClickListener(this);
-//        map.setInfoWindowAdapter(this);
+        map.setOnMapClickListener(new AMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                Toast.makeText(mContext, " map click", Toast.LENGTH_SHORT).show();
+            }
+        });
+        map.setOnMarkerClickListener(new AMap.OnMarkerClickListener() {
+            @Override
+            public boolean onMarkerClick(Marker marker) {
+                Toast.makeText(mContext, " marker click", Toast.LENGTH_SHORT).show();
+                return false;
+            }
+        });
+        map.setOnInfoWindowClickListener(new AMap.OnInfoWindowClickListener() {
+            @Override
+            public void onInfoWindowClick(Marker marker) {
+                Toast.makeText(mContext, " info window click", Toast.LENGTH_SHORT).show();
+            }
+        });
+        map.setInfoWindowAdapter(this);
     }
 
     /**
@@ -322,5 +351,55 @@ public class HomeActivity extends AppCompatActivity implements LocationSource, A
         walkRouteOverlay.removeFromMap();
         walkRouteOverlay.addToMap();
         walkRouteOverlay.zoomToSpan();
+    }
+
+    @Override
+    public View getInfoWindow(final Marker marker) {
+        View pop = getLayoutInflater().inflate(R.layout.map_pop_window, null);
+        pop.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(mContext,"getInfoWindow",Toast.LENGTH_SHORT).show();
+                startAMapNavi(marker);
+            }
+        });
+        return pop;
+    }
+
+    @Override
+    public View getInfoContents(final Marker marker) {
+        View pop = getLayoutInflater().inflate(R.layout.map_pop_window, null);
+        pop.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(mContext,"getInfoContent",Toast.LENGTH_SHORT).show();
+                startAMapNavi(marker
+                );
+            }
+        });
+        return pop;
+    }
+
+    /**
+     * 调起高德地图导航功能，如果没安装高德地图，会进入异常，可以在异常中处理，调起高德地图app的下载页面
+     */
+    public void startAMapNavi(Marker marker) {
+        // 构造导航参数
+        NaviPara naviPara = new NaviPara();
+        // 设置终点位置
+        naviPara.setTargetPoint(marker.getPosition());
+        // 设置导航策略，这里是避免拥堵
+        naviPara.setNaviStyle(AMapUtils.DRIVING_AVOID_CONGESTION);
+
+        // 调起高德地图导航
+        try {
+            AMapUtils.openAMapNavi(naviPara, getApplicationContext());
+        } catch (com.amap.api.maps2d.AMapException e) {
+
+            // 如果没安装会进入异常，调起下载页面
+            AMapUtils.getLatestAMapApp(getApplicationContext());
+
+        }
+
     }
 }
