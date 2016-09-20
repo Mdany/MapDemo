@@ -31,4 +31,8 @@ dependencies {
     compile 'com.android.support:appcompat-v7:23.4.0'
     compile files('libs/BaiduLBS_Android.jar')
     compile files('libs/AMap2DMap_2.8.1_AMapSearch_3.2.1_AMapLocation_2.4.1_20160425.jar')
+    compile 'com.google.android.gms:play-services:9.0.2'
+    compile 'com.google.android.gms:play-services-ads:9.0.2'
+    compile 'com.google.android.gms:play-services-auth:9.0.2'
+    compile 'com.google.android.gms:play-services-gcm:9.0.2'
 }
